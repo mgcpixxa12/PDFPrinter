@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Print PDFs from ZIP</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+</head>
+<body>
+
+<h2>Upload ZIP of PDFs</h2>
+<input type="file" id="zipInput" accept=".zip">
+
+<script>
+document.getElementById("zipInput").addEventListener("change", async (event) => {
+
+  const file = event.target.files[0]
+  const zip = await JSZip.loadAsync(file)
+
+  const mergedPdf = await PDFLib.PDFDocument.create()
+
+  for (const filename of Object.keys(zip.files)) {
+
+    if (filename.toLowerCase().endsWith(".pdf")) {
+
+      const pdfBytes = await zip.files[filename].async("arraybuffer")
+      const pdf = await PDFLib.PDFDocument.load(pdfBytes)
+      const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices())
+
+      pages.forEach(page => mergedPdf.addPage(page))
+    }
+  }
+
+  const mergedBytes = await mergedPdf.save()
+
+  const blob = new Blob([mergedBytes], { type: "application/pdf" })
+  const url = URL.createObjectURL(blob)
+
+  const win = window.open(url)
+  win.onload = () => win.print()
+})
+</script>
+
+</body>
+</html>
