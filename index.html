@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+<meta charset="UTF-8">
+<title>ZIP PDF Printer</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+
+<style>
+body{
+font-family:Arial;
+background:#f4f6f8;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+margin:0;
+}
+
+.container{
+background:white;
+padding:40px;
+border-radius:12px;
+box-shadow:0 10px 30px rgba(0,0,0,0.1);
+text-align:center;
+width:420px;
+}
+
+h2{
+margin-top:0;
+}
+
+input{
+margin-top:20px;
+}
+
+#status{
+margin-top:20px;
+font-size:14px;
+color:#444;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+<h2>Upload ZIP of PDFs</h2>
+<p>Select a zipped folder containing PDFs.</p>
+
+<input type="file" id="zipInput" accept=".zip">
+
+<div id="status"></div>
+</div>
+
+<script>
+
+const statusBox = document.getElementById("status")
+
+document.getElementById("zipInput").addEventListener("change", async (event)=>{
+
+statusBox.innerText="Reading ZIP file..."
+
+const file = event.target.files[0]
+
+const zip = await JSZip.loadAsync(file)
+
+const mergedPdf = await PDFLib.PDFDocument.create()
+
+const files = Object.keys(zip.files)
+.filter(name=>name.toLowerCase().endsWith(".pdf"))
+.sort()
+
+let successCount = 0
+let skippedCount = 0
+
+for(const filename of files){
+
+statusBox.innerText="Processing: "+filename
+
+try{
+
+const pdfBytes = await zip.files[filename].async("arraybuffer")
+
+const pdf = await PDFLib.PDFDocument.load(pdfBytes,{
+ignoreEncryption:true
+})
+
+const pages = await mergedPdf.copyPages(pdf,pdf.getPageIndices())
+
+pages.forEach(p=>mergedPdf.addPage(p))
+
+successCount++
+
+}catch(err){
+
+console.warn("Skipped:",filename,err)
+
+skippedCount++
+
+}
+
+}
+
+statusBox.innerText="Merging PDFs..."
+
+const mergedBytes = await mergedPdf.save()
+
+const blob = new Blob([mergedBytes],{type:"application/pdf"})
+
+const url = URL.createObjectURL(blob)
+
+statusBox.innerText=
+"Done! Loaded "+successCount+" PDFs. Skipped "+skippedCount+". Opening print..."
+
+const win = window.open(url)
+
+win.onload=()=>win.print()
+
+})
+
+</script>
+
+</body>
+</html>
